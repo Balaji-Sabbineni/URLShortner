@@ -1,6 +1,3 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
 name: Node.js CI
 
 on:
@@ -11,52 +8,42 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    env:
-      # MongoDB environment variables
-      MONGOURL: ${{ secrets.MONGOURL }}
-
-    strategy:
-      matrix:
-        node-version: [20.x]
-
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
-    # - name: Log in to Docker Hub
-    #   uses: docker/login-action@v2
-    #   with:
-    #     username: ${{ secrets.DOCKER_USERNAME }}
-    #     password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
 
     - name: Pull Docker image
       run: docker pull balajisabbineni/urlshortner:v1.0
 
-    - name: Run Docker container
-      run: docker compose up -d
+    - name: Run Docker Compose
+      run: docker-compose up -d
 
     - name: Wait for services to be ready
-      run: sleep 10 
+      run: sleep 10
+
+    - name: Check Docker Compose logs for errors
+      run: |
+        docker-compose logs --no-color > docker-compose-logs.txt
+        if grep -i "error" docker-compose-logs.txt; then
+          echo "Errors found in logs"
+          exit 1
+        fi
+
+    - name: Upload Docker Compose logs
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-compose-logs
+        path: docker-compose-logs.txt
 
     - name: Stop Docker container
       run: docker compose down
-
-    - name: Cache node_modules
-      uses: actions/cache@v3
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-${{ matrix.node-version }}-
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - run: npm ci
-    - run: npm start &
-    - run: sleep 10 && kill $! || true
-
