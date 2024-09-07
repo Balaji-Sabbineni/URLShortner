@@ -26,14 +26,14 @@ jobs:
       run: docker pull balajisabbineni/urlshortner:v1.0
 
     - name: Run Docker Compose
-      run: docker-compose up -d
+      run: docker compose up -d
 
     - name: Wait for services to be ready
       run: sleep 10
 
     - name: Check Docker Compose logs for errors
       run: |
-        docker-compose logs --no-color > docker-compose-logs.txt
+        docker compose logs --no-color > docker-compose-logs.txt
         if grep -i "error" docker-compose-logs.txt; then
           echo "Errors found in logs"
           exit 1
